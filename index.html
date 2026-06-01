@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Receptionist - Test Phone</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #chatbox { width: 400px; height: 300px; border: 1px solid #444; border-radius: 10px; padding: 15px; overflow-y: auto; background: #16213e; margin-bottom: 20px; }
+        .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; max-width: 80%; }
+        .user { background: #0f3460; align-self: flex-end; text-align: right; margin-left: auto; }
+        .ai { background: #e94560; align-self: flex-start; }
+        button { padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px; cursor: pointer; background: #e94560; color: white; transition: 0.3s; }
+        button:hover { background: #ff5c77; }
+        button:disabled { background: #555; cursor: not-allowed; }
+        #status { margin-top: 15px; font-style: italic; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <h2>Meridian Corp Receptionist</h2>
+    <div id="chatbox"></div>
+    
+    <button id="mic-btn">Hold to Speak</button>
+    <div id="status">Connecting to FastAPI...</div>
+
+    <script>
+        const chatbox = document.getElementById('chatbox');
+        const micBtn = document.getElementById('mic-btn');
+        const statusDiv = document.getElementById('status');
+
+        // Connect to FastAPI WebSocket
+        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+        ws.onopen = () => {
+            statusDiv.innerText = "Connected. Hold button to speak.";
+            micBtn.disabled = false;
+        };
+
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            addMessage("Aria (AI): " + data.text, "ai");
+            
+            // Play the audio returned by Edge-TTS
+            const audioBytes = atob(data.audio);
+            const audioArray = new Uint8Array(audioBytes.length);
+            for (let i = 0; i < audioBytes.length; i++) {
+                audioArray[i] = audioBytes.charCodeAt(i);
+            }
+            const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
+            const audioUrl = URL.createObjectURL(audioBlob);
+            const audio = new Audio(audioUrl);
+            audio.play();
+            
+            statusDiv.innerText = "Connected. Hold button to speak.";
+            micBtn.disabled = false;
+        };
+
+        ws.onclose = () => {
+            statusDiv.innerText = "Disconnected. Please refresh.";
+            micBtn.disabled = true;
+        };
+
+        function addMessage(text, type) {
+            const div = document.createElement('div');
+            div.className = `msg ${type}`;
+            div.innerText = text;
+            chatbox.appendChild(div);
+            chatbox.scrollTop = chatbox.scrollHeight;
+        }
+
+        // Browser Speech-to-Text Setup
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let recognition;
+
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'en-US';
+
+            recognition.onresult = (event) => {
+                const transcript = event.results[0][0].transcript;
+                addMessage("You: " + transcript, "user");
+                ws.send(JSON.stringify({ text: transcript }));
+                statusDiv.innerText = "Aria is thinking...";
+                micBtn.disabled = true;
+            };
+
+            recognition.onerror = () => {
+                statusDiv.innerText = "Error listening. Try again.";
+                micBtn.disabled = false;
+            };
+
+            recognition.onend = () => {
+                micBtn.innerText = "Hold to Speak";
+            };
+
+        } else {
+            statusDiv.innerText = "Your browser doesn't support Speech API. Use Chrome.";
+            micBtn.disabled = true;
+        }
+
+        // Button controls
+        micBtn.addEventListener('mousedown', () => {
+            if (recognition && ws.readyState === WebSocket.OPEN) {
+                recognition.start();
+                micBtn.innerText = "Listening...";
+                statusDiv.innerText = "Listening...";
+            }
+        });
+
+        micBtn.addEventListener('mouseup', () => {
+            if (recognition) {
+                recognition.stop();
+            }
+        });
+    </script>
+</body>
+</html>
