@@ -1,0 +1,234 @@
+{
+  "name": "AI Receptionist - Meridian Corp",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-receptionist",
+        "responseMode": "lastNode"
+      },
+      "id": "webhook-1",
+      "name": "Webhook from FastAPI",
+      "type": "n8n-nodes-base.webhook",
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value1": "={{ $json.event }}",
+              "value2": "message_processed",
+              "operation": "equal"
+            },
+            {
+              "value1": "={{ $json.event }}",
+              "value2": "session_ended",
+              "operation": "equal"
+            },
+            {
+              "value1": "={{ $json.event }}",
+              "value2": "lead_capture",
+              "operation": "equal"
+            },
+            {
+              "value1": "={{ $json.event }}",
+              "value2": "appointment_request",
+              "operation": "equal"
+            }
+          ]
+        }
+      },
+      "id": "switch-1",
+      "name": "Route by Event",
+      "type": "n8n-nodes-base.switch",
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "rules": [
+            {
+              "value1": "={{ $json.intent.type }}",
+              "value2": "escalation",
+              "operation": "equal"
+            },
+            {
+              "value1": "={{ $json.intent.type }}",
+              "value2": "appointment",
+              "operation": "equal"
+            },
+            {
+              "value1": "={{ $json.intent.is_lead }}",
+              "value2": true,
+              "operation": "equal"
+            }
+          ]
+        }
+      },
+      "id": "switch-2",
+      "name": "Route by Intent",
+      "type": "n8n-nodes-base.switch",
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=🚨 *ESCALATION NEEDED*\n\n*Message:* {{ $json.user_message }}\n*Response:* {{ $json.ai_response }}\n*Session:* {{ $json.session_id }}\n*Contact:* {{ $json.visitor_info.email || $json.visitor_info.phone || 'Not provided' }}"
+      },
+      "id": "slack-1",
+      "name": "Slack Escalation Alert",
+      "type": "n8n-nodes-base.slack",
+      "position": [920, 100]
+    },
+    {
+      "parameters": {
+        "to": "admin@meridiancorp.com",
+        "subject": "=🚨 Escalation - AI Receptionist",
+        "text": "=Visitor needs human assistance:\n\nMessage: {{ $json.user_message }}\nSession: {{ $json.session_id }}\nVisitor Info: {{ JSON.stringify($json.visitor_info) }}"
+      },
+      "id": "email-1",
+      "name": "Email Escalation",
+      "type": "n8n-nodes-base.emailSend",
+      "position": [1140, 100]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=📅 *New Appointment Request*\n\n*Name:* {{ $json.visitor_info.name || 'TBD' }}\n*Date:* {{ $json.user_message }}\n*Contact:* {{ $json.visitor_info.email || 'Not provided' }}\n\nGo to Google Calendar to confirm."
+      },
+      "id": "slack-2",
+      "name": "Slack Appointment",
+      "type": "n8n-nodes-base.slack",
+      "position": [920, 250]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "spreadsheetId": "YOUR_GOOGLE_SHEET_ID",
+        "range": "Leads!A:F",
+        "options": {}
+      },
+      "id": "sheets-1",
+      "name": "Add to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "position": [920, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-1",
+              "leftValue": "={{ $json.is_qualified_lead }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-1",
+      "name": "Only Qualified Leads",
+      "type": "n8n-nodes-base.filter",
+      "position": [680, 450]
+    },
+    {
+      "parameters": {
+        "channel": "slack",
+        "text": "=🎯 *Qualified Lead from Voice Call*\n\n*Session:* {{ $json.session_id }}\n*Messages:* {{ $json.message_count }}\n*Info:* {{ JSON.stringify($json.visitor_info) }}"
+      },
+      "id": "slack-3",
+      "name": "Slack Lead Notification",
+      "type": "n8n-nodes-base.slack",
+      "position": [920, 500]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "databaseId": "YOUR_NOTION_DATABASE_ID",
+        "properties": {}
+      },
+      "id": "notion-1",
+      "name": "Add to Notion CRM",
+      "type": "n8n-nodes-base.notion",
+      "position": [1140, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ received: true }) }}"
+      },
+      "id": "respond-1",
+      "name": "Respond to FastAPI",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [1400, 300]
+    }
+  ],
+  "connections": {
+    "Webhook from FastAPI": {
+      "main": [
+        [{"node": "Route by Event", "type": "main", "index": 0}]
+      ]
+    },
+    "Route by Event": {
+      "main": [
+        [{"node": "Route by Intent", "type": "main", "index": 0}],
+        [{"node": "Only Qualified Leads", "type": "main", "index": 0}],
+        [{"node": "Add to Google Sheets", "type": "main", "index": 0}],
+        [{"node": "Slack Appointment", "type": "main", "index": 0}]
+      ]
+    },
+    "Route by Intent": {
+      "main": [
+        [{"node": "Slack Escalation Alert", "type": "main", "index": 0}],
+        [{"node": "Add to Google Sheets", "type": "main", "index": 0}],
+        [{"node": "Add to Google Sheets", "type": "main", "index": 0}]
+      ]
+    },
+    "Slack Escalation Alert": {
+      "main": [
+        [{"node": "Email Escalation", "type": "main", "index": 0}]
+      ]
+    },
+    "Email Escalation": {
+      "main": [
+        [{"node": "Respond to FastAPI", "type": "main", "index": 0}]
+      ]
+    },
+    "Slack Appointment": {
+      "main": [
+        [{"node": "Respond to FastAPI", "type": "main", "index": 0}]
+      ]
+    },
+    "Add to Google Sheets": {
+      "main": [
+        [{"node": "Respond to FastAPI", "type": "main", "index": 0}]
+      ]
+    },
+    "Only Qualified Leads": {
+      "main": [
+        [{"node": "Slack Lead Notification", "type": "main", "index": 0}]
+      ]
+    },
+    "Slack Lead Notification": {
+      "main": [
+        [{"node": "Add to Notion CRM", "type": "main", "index": 0}]
+      ]
+    },
+    "Add to Notion CRM": {
+      "main": [
+        [{"node": "Respond to FastAPI", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}

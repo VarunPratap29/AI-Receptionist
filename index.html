@@ -1,66 +1,219 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-IN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Receptionist - Test Phone</title>
+    <title>AI Receptionist - GrowPilot</title>
     <style>
-        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #chatbox { width: 400px; height: 300px; border: 1px solid #444; border-radius: 10px; padding: 15px; overflow-y: auto; background: #16213e; margin-bottom: 20px; }
-        .msg { margin-bottom: 10px; padding: 8px; border-radius: 5px; max-width: 80%; }
-        .user { background: #0f3460; align-self: flex-end; text-align: right; margin-left: auto; }
-        .ai { background: #e94560; align-self: flex-start; }
-        button { padding: 15px 30px; font-size: 18px; border: none; border-radius: 50px; cursor: pointer; background: #e94560; color: white; transition: 0.3s; }
-        button:hover { background: #ff5c77; }
-        button:disabled { background: #555; cursor: not-allowed; }
-        #status { margin-top: 15px; font-style: italic; color: #aaa; }
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            margin: 0; 
+        }
+        h2 { margin-bottom: 20px; color: #e94560; letter-spacing: 1px; }
+        
+        #chatbox { 
+            width: 100%; 
+            max-width: 420px; 
+            height: 350px; 
+            border: 1px solid #333; 
+            border-radius: 16px; 
+            padding: 20px; 
+            overflow-y: auto; 
+            background: rgba(22, 33, 62, 0.8); 
+            margin-bottom: 20px; 
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .msg { 
+            padding: 12px 16px; 
+            border-radius: 16px; 
+            max-width: 85%; 
+            line-height: 1.4;
+            animation: fadeIn 0.3s ease-in;
+        }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        
+        .user { 
+            background: #0f3460; 
+            align-self: flex-end; 
+            border-bottom-right-radius: 4px; 
+        }
+        .ai { 
+            background: #e94560; 
+            align-self: flex-start; 
+            border-bottom-left-radius: 4px; 
+        }
+
+        .controls { 
+            width: 100%; 
+            max-width: 420px; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 15px; 
+        }
+        
+        #mic-btn { 
+            width: 70px; 
+            height: 70px; 
+            border-radius: 50%; 
+            border: none; 
+            background: #e94560; 
+            color: white; 
+            font-size: 28px; 
+            cursor: pointer; 
+            box-shadow: 0 5px 15px rgba(233, 69, 96, 0.4);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #mic-btn:hover:not(:disabled) { background: #ff5c77; transform: scale(1.05); }
+        #mic-btn:active, #mic-btn.listening { background: #ff2d55; transform: scale(0.95); box-shadow: 0 0 0 8px rgba(255, 45, 85, 0.2); }
+        #mic-btn:disabled { background: #555; cursor: not-allowed; box-shadow: none; }
+
+        .text-input-area { 
+            width: 100%; 
+            display: flex; 
+            gap: 10px; 
+        }
+        #text-input { 
+            flex: 1; 
+            padding: 12px 16px; 
+            border-radius: 30px; 
+            border: 1px solid #333; 
+            background: #16213e; 
+            color: white; 
+            font-size: 14px; 
+            outline: none; 
+            transition: border 0.3s;
+        }
+        #text-input:focus { border-color: #e94560; }
+        #text-send { 
+            padding: 0 20px; 
+            border-radius: 30px; 
+            border: none; 
+            background: #0f3460; 
+            color: white; 
+            font-weight: bold; 
+            cursor: pointer; 
+            transition: background 0.3s;
+        }
+        #text-send:hover { background: #1a4a8a; }
+
+        #status { 
+            font-size: 13px; 
+            color: #888; 
+            text-align: center; 
+            min-height: 20px;
+        }
+        #error-detail { color: #ff6b6b; font-size: 12px; text-align: center; display: none; margin-top: -10px; }
     </style>
 </head>
 <body>
 
-    <h2>Meridian Corp Receptionist</h2>
+    <h2>GrowPilot</h2>
     <div id="chatbox"></div>
     
-    <button id="mic-btn">Hold to Speak</button>
-    <div id="status">Connecting to FastAPI...</div>
+    <div class="controls">
+        <button id="mic-btn" disabled>🎤</button>
+        <div id="status">Connecting to Aria...</div>
+        <div id="error-detail"></div>
+        
+        <div class="text-input-area">
+            <input type="text" id="text-input" placeholder="Or type a message here...">
+            <button id="text-send">Send</button>
+        </div>
+    </div>
 
     <script>
         const chatbox = document.getElementById('chatbox');
         const micBtn = document.getElementById('mic-btn');
         const statusDiv = document.getElementById('status');
+        const errorDetail = document.getElementById('error-detail');
+        const textInput = document.getElementById('text-input');
+        const textSend = document.getElementById('text-send');
 
-        // Connect to FastAPI WebSocket
-        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        let ws;
+        let isConnected = false;
+        let currentAudio = null; // Tracks the AI's voice so we can kill it
 
-        ws.onopen = () => {
-            statusDiv.innerText = "Connected. Hold button to speak.";
-            micBtn.disabled = false;
-        };
+        // =========================================================================
+        // 1. WEBSOCKET CONNECTION (With Auto-Reconnect)
+        // =========================================================================
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            statusDiv.innerText = "Connecting...";
+            statusDiv.style.color = "#aaa";
 
-        ws.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-            addMessage("Aria (AI): " + data.text, "ai");
-            
-            // Play the audio returned by Edge-TTS
-            const audioBytes = atob(data.audio);
-            const audioArray = new Uint8Array(audioBytes.length);
-            for (let i = 0; i < audioBytes.length; i++) {
-                audioArray[i] = audioBytes.charCodeAt(i);
-            }
-            const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
-            const audioUrl = URL.createObjectURL(audioBlob);
-            const audio = new Audio(audioUrl);
-            audio.play();
-            
-            statusDiv.innerText = "Connected. Hold button to speak.";
-            micBtn.disabled = false;
-        };
+            ws.onopen = () => {
+                isConnected = true;
+                statusDiv.innerText = "Online - Hold mic to speak, or type below";
+                statusDiv.style.color = "#4ecdc4";
+                micBtn.disabled = false;
+                errorDetail.style.display = 'none';
+            };
 
-        ws.onclose = () => {
-            statusDiv.innerText = "Disconnected. Please refresh.";
-            micBtn.disabled = true;
-        };
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addMessage("Aria: " + data.text, "ai");
+                
+                // Play Edge-TTS Audio safely (With Barge-In support)
+                try {
+                    // 1. Kill any audio that is currently playing
+                    if (currentAudio) {
+                        currentAudio.pause();
+                        currentAudio.currentTime = 0;
+                    }
 
+                    const audioBytes = atob(data.audio);
+                    const audioArray = new Uint8Array(audioBytes.length);
+                    for (let i = 0; i < audioBytes.length; i++) {
+                        audioArray[i] = audioBytes.charCodeAt(i);
+                    }
+                    const audioBlob = new Blob([audioArray], { type: 'audio/mp3' });
+                    const audioUrl = URL.createObjectURL(audioBlob);
+                    
+                    // 2. Save to global tracker
+                    currentAudio = new Audio(audioUrl);
+                    currentAudio.onended = () => { currentAudio = null; };
+                    currentAudio.play().catch(e => console.log("Audio blocked by browser:", e));
+                } catch (e) {
+                    console.error("Audio decoding error:", e);
+                }
+                
+                resetUI();
+            };
+
+            ws.onclose = () => {
+                isConnected = false;
+                statusDiv.innerText = "Disconnected - Reconnecting in 3s...";
+                statusDiv.style.color = "#ff6b6b";
+                micBtn.disabled = true;
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = () => {
+                statusDiv.innerText = "Connection error - Retrying...";
+            };
+        }
+
+        connectWebSocket();
+
+        // =========================================================================
+        // 2. UI HELPERS
+        // =========================================================================
         function addMessage(text, type) {
             const div = document.createElement('div');
             div.className = `msg ${type}`;
@@ -69,7 +222,35 @@
             chatbox.scrollTop = chatbox.scrollHeight;
         }
 
-        // Browser Speech-to-Text Setup
+        function sendMessage(text) {
+            if (!text.trim() || !isConnected) return;
+            addMessage("You: " + text, "user");
+            ws.send(JSON.stringify({ text: text }));
+            statusDiv.innerText = "Aria is thinking...";
+            statusDiv.style.color = "#ffe66d";
+            micBtn.disabled = true;
+            textInput.value = '';
+        }
+
+        function resetUI() {
+            statusDiv.innerText = "Online - Hold mic to speak, or type below";
+            statusDiv.style.color = "#4ecdc4";
+            micBtn.disabled = false;
+            micBtn.classList.remove('listening');
+            micBtn.innerText = '🎤';
+        }
+
+        // =========================================================================
+        // 3. TEXT INPUT FALLBACK
+        // =========================================================================
+        textSend.addEventListener('click', () => sendMessage(textInput.value));
+        textInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage(textInput.value);
+        });
+
+        // =========================================================================
+        // 4. SPEECH-TO-TEXT (Bilingual: Hindi + English)
+        // =========================================================================
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         let recognition;
 
@@ -77,44 +258,89 @@
             recognition = new SpeechRecognition();
             recognition.continuous = false;
             recognition.interimResults = false;
-            recognition.lang = 'en-US';
+            recognition.lang = 'en-IN'; 
 
             recognition.onresult = (event) => {
                 const transcript = event.results[0][0].transcript;
-                addMessage("You: " + transcript, "user");
-                ws.send(JSON.stringify({ text: transcript }));
-                statusDiv.innerText = "Aria is thinking...";
-                micBtn.disabled = true;
+                sendMessage(transcript);
             };
 
-            recognition.onerror = () => {
-                statusDiv.innerText = "Error listening. Try again.";
+            recognition.onerror = (event) => {
+                errorDetail.style.display = 'block';
                 micBtn.disabled = false;
+                micBtn.classList.remove('listening');
+                micBtn.innerText = '🎤';
+
+                switch(event.error) {
+                    case 'not-allowed':
+                        errorDetail.innerText = "Mic blocked. Click the lock icon in URL bar -> Allow Microphone.";
+                        break;
+                    case 'no-speech':
+                        errorDetail.innerText = "Couldnt hear anything. Try again.";
+                        break;
+                    case 'audio-capture':
+                        errorDetail.innerText = "No microphone found. Please check your device.";
+                        break;
+                    default:
+                        errorDetail.innerText = `Mic error: ${event.error}`;
+                }
             };
 
             recognition.onend = () => {
-                micBtn.innerText = "Hold to Speak";
+                micBtn.classList.remove('listening');
+                micBtn.innerText = '🎤';
             };
 
         } else {
-            statusDiv.innerText = "Your browser doesn't support Speech API. Use Chrome.";
-            micBtn.disabled = true;
+            statusDiv.innerText = "Voice not supported. Please use Chrome/Edge or type below.";
+            micBtn.style.display = 'none';
         }
 
-        // Button controls
-        micBtn.addEventListener('mousedown', () => {
-            if (recognition && ws.readyState === WebSocket.OPEN) {
-                recognition.start();
-                micBtn.innerText = "Listening...";
-                statusDiv.innerText = "Listening...";
-            }
-        });
+        // =========================================================================
+        // 5. MICROPHONE BUTTON CONTROLS (Desktop + Mobile)
+        // =========================================================================
+        
+        // Prevent long-press zoom on mobile
+        micBtn.addEventListener('contextmenu', (e) => e.preventDefault());
 
-        micBtn.addEventListener('mouseup', () => {
-            if (recognition) {
-                recognition.stop();
+        function startListening() {
+            errorDetail.style.display = 'none';
+            
+            // BARGE-IN: Instantly shut up the AI when user holds the mic
+            if (currentAudio) {
+                currentAudio.pause();
+                currentAudio.currentTime = 0;
+                currentAudio = null;
             }
-        });
+
+            if (recognition && isConnected) {
+                try {
+                    recognition.start();
+                    micBtn.classList.add('listening');
+                    micBtn.innerText = '🔴';
+                    statusDiv.innerText = "Listening... Speak now";
+                    statusDiv.style.color = "#ffe66d";
+                } catch(e) {
+                    console.log("Mic already started:", e);
+                }
+            }
+        }
+
+        function stopListening() {
+            if (recognition) {
+                try { recognition.stop(); } catch(e) {}
+            }
+        }
+
+        // Desktop events
+        micBtn.addEventListener('mousedown', startListening);
+        micBtn.addEventListener('mouseup', stopListening);
+        micBtn.addEventListener('mouseleave', stopListening);
+
+        // Mobile touch events
+        micBtn.addEventListener('touchstart', (e) => { e.preventDefault(); startListening(); });
+        micBtn.addEventListener('touchend', (e) => { e.preventDefault(); stopListening(); });
+
     </script>
 </body>
 </html>
